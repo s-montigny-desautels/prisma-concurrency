@@ -31,71 +31,27 @@ async function seed() {
   });
 }
 
-// async function transfer(nth: number, from: string, to: string, amount: number) {
-//   return await prisma.$transaction(
-//     async (prisma) => {
-//       console.time("send " + nth);
-//       const sender = await prisma.account.update({
-//         data: {
-//           balance: {
-//             decrement: amount,
-//           },
-//         },
-//         where: {
-//           email: from,
-//         },
-//       });
-//       console.timeEnd("send " + nth);
-//       console.time("throw " + nth);
-//       if (sender.balance < 0) {
-//         throw new Error(`${from} doesn't have enough to send ${amount}`);
-//       }
-//       console.timeEnd("throw " + nth);
-//       console.time("recieve " + nth);
-//       const recipient = prisma.account.update({
-//         data: {
-//           balance: {
-//             increment: amount,
-//           },
-//         },
-//         where: {
-//           email: to,
-//         },
-//       });
-//       console.timeEnd("recieve " + nth);
-//       return recipient;
-//     },
-//     {
-//       timeout: 20000,
-//     }
-//   );
-// }
-
-setInterval(async () => {
-  console.log(
-    await prisma.account.findUnique({ where: { email: "alice@prisma.io" } })
-  );
-}, 5000);
-
 async function main() {
   await prisma.$connect();
   await unseed();
   await seed();
-  console.time("transfer");
-  // await transfer(1, "alice@prisma.io", "bob@prisma.io", 100);
-  // await transfer(2, "alice@prisma.io", "bob@prisma.io", 100);
+  console.time("queries");
 
-  const req = new Array(40000).fill(0).map(
+  const req = new Array(2000).fill(0).map(
     (_, i) =>
       new Promise((res) =>
         setTimeout(() => {
           res(
-            prisma.account
-              .findUnique({
-                where: { email: "alice@prisma.io" },
-                include: { User: true },
-              })
-              .then(() => console.log(`Done ${i}`))
+            prisma
+              .$transaction([
+                prisma.account.findUnique({
+                  where: { email: "alice@prisma.io" },
+                }),
+                prisma.user.findUnique({
+                  where: { name: "alice" },
+                }),
+              ])
+              .then(() => console.log(`Done transaction ${i}`))
           );
         }, Math.floor(Math.random() * (10 - 1 + 1) + 1))
       )
@@ -103,16 +59,18 @@ async function main() {
 
   await Promise.all(req);
 
-  // await transfer(1, "alice@prisma.io", "bob@prisma.io", 100);
-  // await transfer(2, "alice@prisma.io", "bob@prisma.io", 100);
-
-  // await Promise.all([
-  //   transfer(1, "alice@prisma.io", "bob@prisma.io", 100),
-  //   transfer(2, "alice@prisma.io", "bob@prisma.io", 100),
-  // ]);
-  console.timeEnd("transfer");
+  console.timeEnd("queries");
 }
 
 main()
   .catch(console.error)
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    console.log("Doing last query...");
+    console.time("lastQuery");
+
+    console.log(await prisma.account.findMany());
+
+    console.timeEnd("lastQuery");
+    prisma.$disconnect();
+    console.log("Done");
+  });
