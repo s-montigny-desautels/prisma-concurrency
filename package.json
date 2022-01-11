@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "init": "prisma db push",
     "start": "RUST_BACKTRACE=1 ts-node index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
